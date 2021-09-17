@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">OtgTest</string>
+    <string name="button1">버튼1</string>
+    <string name="button2">버튼2</string>
+    <string name="button3">버튼3</string>
+    <string name="button4">버튼4</string>
+    <string name="blank_msg">No data</string>
 </resources>
