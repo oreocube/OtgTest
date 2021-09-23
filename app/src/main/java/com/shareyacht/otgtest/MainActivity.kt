@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.hardware.usb.UsbManager
 import android.location.Location
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -43,6 +44,15 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         setContentView(R.layout.activity_main)
 
         mBinding = ActivityMainBinding.inflate(layoutInflater)
+
+
+
+        val manager = getSystemService(Context.USB_SERVICE) as UsbManager
+        val deviceList = manager.deviceList
+        printToast(deviceList.toString())
+
+
+
 
         // 앱 실행 시 위치 권한 얻기
         checkLocationPermission()
