@@ -13,6 +13,7 @@ import android.os.Message
 import android.text.method.ScrollingMovementMethod
 import android.util.Log
 import android.view.View
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.*
 import com.shareyacht.otgtest.databinding.ActivityMainBinding
@@ -86,30 +87,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
                 // 권한이 허용되어 있는 경우
                 Log.d(TAG, "퍼미션 허용되어 있음")
 
-                fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this)
-
-                locationRequest = LocationRequest.create().apply {
-                    interval = TimeUnit.SECONDS.toMillis(2)
-                    fastestInterval = TimeUnit.SECONDS.toMillis(1)
-                    maxWaitTime = TimeUnit.SECONDS.toMillis(3)
-
-                    priority = LocationRequest.PRIORITY_HIGH_ACCURACY
-                }
-
-                locationCallback = object : LocationCallback() {
-                    override fun onLocationResult(locationResult: LocationResult) {
-                        super.onLocationResult(locationResult)
-                        val now = System.currentTimeMillis()
-                        val date = Date(now)
-                        val sdf = SimpleDateFormat("MM/dd hh:mm:ss", Locale.KOREA)
-                        currentLocation = locationResult.lastLocation
-
-                        Log.d(TAG, sdf.format(date))
-                        Log.d(TAG, "${currentLocation!!.latitude}//${currentLocation!!.longitude}")
-                    }
-                }
-
-                fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
+                initFusedLocationProviderClient()
             }
             shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION) -> {
                 Log.d(TAG, "ACCESS_FINE_LOCATION 퍼미션 필요")
@@ -138,6 +116,63 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         }
     }
 
+    private fun initFusedLocationProviderClient() {
+        fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this)
+
+        locationRequest = LocationRequest.create().apply {
+            interval = TimeUnit.SECONDS.toMillis(2)
+            fastestInterval = TimeUnit.SECONDS.toMillis(1)
+            maxWaitTime = TimeUnit.SECONDS.toMillis(3)
+
+            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+        }
+
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult) {
+                super.onLocationResult(locationResult)
+                val now = System.currentTimeMillis()
+                val date = Date(now)
+                val sdf = SimpleDateFormat("MM/dd hh:mm:ss", Locale.KOREA)
+                currentLocation = locationResult.lastLocation
+
+                val data = "Date : ${sdf.format(date)} \n lat : ${currentLocation!!.latitude}, lon : ${currentLocation!!.longitude}"
+
+                printToast(data)
+                Log.d(TAG, data)
+
+                // 아두이노로 전송
+                mSerialConnector.sendCommand(data)
+            }
+        }
+
+        try {
+            fusedLocationProviderClient.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                Looper.getMainLooper()
+            )
+        } catch (e: SecurityException) {
+            e.printStackTrace()
+        }
+
+    }
+
+    override fun onPause() {
+        super.onPause()
+        printToast("onPause() called")
+        Log.d(TAG, "MainActivity - onPause() called")
+        // 앱 종료 시 위치 추적 종료
+        if (this::fusedLocationProviderClient.isInitialized) { // fusedLocationProviderClient 객체가 초기화되어 있을 때만
+            stopLocationUpdates()
+        }
+    }
+
+    private fun stopLocationUpdates() {
+        printToast("removeLocationUpdates() called")
+        Log.d(TAG, "MainActivity - stopLocationUpdates() called")
+        fusedLocationProviderClient.removeLocationUpdates(locationCallback)
+    }
+
     override fun onClick(v: View) {
         when (v.id) {
             R.id.button_send1 -> mSerialConnector.sendCommand("b1")
@@ -151,16 +186,20 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         fun onReceive(msg: Int, arg0: Int, arg1: Int, arg2: String, arg3: Any?) {
             when (msg) {
                 Constants.MSG_DEVICE_INFO -> {
+                    printToast(arg2)
                     mBinding.textSerial.append(arg2)
                 }
                 Constants.MSG_DEVICE_COUNT -> {
+                    printToast("$arg0 device(S) fount")
                     mBinding.textSerial.append("$arg0 device(S) fount \n")
                 }
                 Constants.MSG_READ_DATA_COUNT -> {
+                    printToast("$arg0 buffer received")
                     mBinding.textSerial.append("$arg0 buffer received \n")
                 }
                 Constants.MSG_READ_DATA -> {
                     if (arg3 != null) {
+                        printToast(arg3.toString())
                         mBinding.apply {
                             textInfo.text = arg3 as String
                             textSerial.append(arg3)
@@ -183,16 +222,21 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         override fun handleMessage(msg: Message) {
             when (msg.what) {
                 Constants.MSG_DEVICE_INFO -> {
+                    printToast(msg.obj.toString())
                     mBinding.textSerial.append(msg.obj as String)
                 }
                 Constants.MSG_DEVICE_COUNT -> {
+                    printToast("${msg.arg1} device(s) found")
                     mBinding.textSerial.append("${msg.arg1} device(s) found \n")
                 }
                 Constants.MSG_READ_DATA_COUNT -> {
+                    printToast(msg.obj.toString())
                     mBinding.textSerial.append("${msg.obj}\n")
                 }
                 Constants.MSG_READ_DATA -> {
                     if (msg.obj != null) {
+                        printToast(msg.obj.toString())
+
                         mBinding.apply {
                             textInfo.text = msg.obj as String
                             textSerial.append(msg.obj as String)
@@ -208,6 +252,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         }
     }
 
-
+    fun printToast(message: String) {
+        Toast.makeText(applicationContext, message, Toast.LENGTH_LONG).show()
+    }
 }
-

@@ -5,6 +5,7 @@ import android.hardware.usb.UsbManager
 import android.os.Handler
 import android.os.Message
 import android.util.Log
+import android.widget.Toast
 import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
@@ -12,6 +13,7 @@ import java.io.IOException
 import java.util.*
 
 private const val TAG = "로그"
+
 class SerialConnector(c: Context, l: MainActivity.SerialListener, h: Handler) {
     private val tag = "SerialConnector"
 
@@ -44,6 +46,8 @@ class SerialConnector(c: Context, l: MainActivity.SerialListener, h: Handler) {
         val availableDrivers = UsbSerialProber.getDefaultProber().findAllDrivers(manager)
         if (availableDrivers.isEmpty()) {
             // 사용가능한 기기가 없는 경우
+            Log.d(TAG, "SerialConnector - 사용 가능한 기기 X")
+            printToast("사용 가능한 기기가 없습니다.")
             mListener.onReceive(
                 Constants.MSG_SERIAL_ERROR,
                 0,
@@ -53,8 +57,13 @@ class SerialConnector(c: Context, l: MainActivity.SerialListener, h: Handler) {
             )
             return
         }
+        Log.d(TAG, "SerialConnector - 사용 가능한 기기 존재")
+        printToast("사용 가능한 기기가 존재합니다.")
+
         mDriver = availableDrivers[0]
         if (mDriver == null) {
+            Log.d(TAG, "SerialConnector - 드라이버 X")
+            printToast("사용 가능한 드라이버가 없습니다.")
             mListener.onReceive(
                 Constants.MSG_SERIAL_ERROR,
                 0,
@@ -64,6 +73,8 @@ class SerialConnector(c: Context, l: MainActivity.SerialListener, h: Handler) {
             )
             return
         }
+        Log.d(TAG, "SerialConnector - 드라이버 존재")
+        printToast("사용 가능한 드라이버가 존재합니다.")
 
         // Report to UI
         val sb = StringBuilder()
@@ -75,10 +86,13 @@ class SerialConnector(c: Context, l: MainActivity.SerialListener, h: Handler) {
             .append(" PID : ").append(device.productId).append("\n")
             .append(" IF Count : ").append(device.interfaceCount).append("\n")
         mListener.onReceive(Constants.MSG_DEVICE_INFO, 0, 0, sb.toString(), null)
+        printToast("-------- device info --------\n $sb")
 
         // 기기와 연결한다.
         val connection = manager.openDevice(device)
         if (connection == null) {
+            Log.d(TAG, "SerialConnector - 기기와 연결할 수 없습니다.")
+            printToast("기기와 연결할 수 없습니다.")
             mListener.onReceive(
                 Constants.MSG_SERIAL_ERROR,
                 0,
@@ -88,10 +102,14 @@ class SerialConnector(c: Context, l: MainActivity.SerialListener, h: Handler) {
             )
             return
         }
+        Log.d(TAG, "SerialConnector - 기기와 연결을 시도합니다.")
+        printToast("기기와 연결을 시도합니다.")
 
         // Read some data! Most have just one port (port 0).
         mPort = mDriver!!.ports[0]
         if (mPort == null) {
+            Log.d(TAG, "SerialConnector - 포트를 찾을 수 없습니다.")
+            printToast("포트를 찾을 수 없습니다.")
             mListener.onReceive(
                 Constants.MSG_SERIAL_ERROR,
                 0,
@@ -101,13 +119,23 @@ class SerialConnector(c: Context, l: MainActivity.SerialListener, h: Handler) {
             )
             return
         }
+        Log.d(TAG, "SerialConnector - 포트를 찾았습니다.")
+        printToast("포트를 찾았습니다.")
+
         try {
             // 포트를 연다.
             mPort!!.open(connection)
-            mPort!!.setParameters(9600, 0, 0, UsbSerialPort.PARITY_NONE) // baudrate:9600, dataBits:8, stopBits:1, parity:N
+            mPort!!.setParameters(
+                9600,
+                0,
+                0,
+                UsbSerialPort.PARITY_NONE
+            ) // baudrate:9600, dataBits:8, stopBits:1, parity:N
 
         } catch (e: IOException) {
             // Deal with error.
+            Log.d(TAG, "SerialConnector - 포트를 열 수 없습니다.")
+            printToast("포트를 열 수 없습니다.")
             mListener.onReceive(
                 Constants.MSG_SERIAL_ERROR,
                 0,
@@ -118,7 +146,7 @@ class SerialConnector(c: Context, l: MainActivity.SerialListener, h: Handler) {
         }
 
         // Everything is fine. Start serial monitoring thread.
-        startThread()
+        // startThread()
     } // End of initialize()
 
     // 연결을 종료한다.
@@ -270,5 +298,7 @@ class SerialConnector(c: Context, l: MainActivity.SerialListener, h: Handler) {
         } // End of run()
     } // End of SerialMonitorThread
 
-
+    private fun printToast(message: String) {
+        Toast.makeText(mContext, message, Toast.LENGTH_LONG).show()
+    }
 }
